@@ -12,6 +12,7 @@ Resources:
   GetCryptoPriceFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: GetCryptoPriceFunction
       CodeUri: getCryptoPriceAndSendEmail/
       Handler: app.handler
       Events:
