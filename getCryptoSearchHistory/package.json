@@ -1,0 +1,11 @@
+{
+    "name": "get-crypto-search-history",
+    "description": "AWS Lambda function to get crypto search history",
+    "version": "1.0.0",
+    "type": "module",
+    "main": "app.mjs",
+    "dependencies": {
+        "@aws-sdk/client-dynamodb": "^3.528.0",
+        "@aws-sdk/lib-dynamodb": "^3.528.0"
+    }
+}

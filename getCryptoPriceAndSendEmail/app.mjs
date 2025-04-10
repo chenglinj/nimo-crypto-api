@@ -1,7 +1,12 @@
 import axios from 'axios';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
+import { PutCommand, DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { v4 as uuidv4 } from 'uuid';
 
 const sesClient = new SESv2Client({ region: 'ap-southeast-2' });
+const dbClient = new DynamoDBClient({ region: 'ap-southeast-2' });
+const dbDocClient = DynamoDBDocumentClient.from(dbClient);
 
 /**
  * Example request:
@@ -10,16 +15,16 @@ const sesClient = new SESv2Client({ region: 'ap-southeast-2' });
  *   "currency": "usd"
  * }
  */
-
 export const handler = async (event) => {
   try {
     const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
     const { crypto = 'bitcoin', currency = 'aud', email } = body;
 
+    // return error message if email address is illegal
     if (!email) {
           return {
             statusCode: 400,
-            body: JSON.stringify({ error: "Missing 'email' in request body" }),
+            body: JSON.stringify({ error: 'Illegal email adddress provided' }),
           };
     }
 
@@ -34,35 +39,16 @@ export const handler = async (event) => {
     }
 
     const price = response.data[crypto][currency];
-    const message = `Hello investor! 🚀\n\nThe current price of ${crypto} is ${price} ${currency}.`;
 
-    // send email
-    const emailParams = {
-      FromEmailAddress: 'chenglinjing11@gmail.com',
-      Destination: {
-        ToAddresses: [email],
-      },
-      Content: {
-        Simple: {
-          Subject: {
-            Data: `Crypto Price: ${crypto}`,
-          },
-          Body: {
-            Text: {
-              Data: message,
-            },
-          },
-        },
-      },
-    };
-
-    const sendCommand = new SendEmailCommand(emailParams);
-    await sesClient.send(sendCommand);
+    // send email via SES
+    await sendEmail({ crypto, price, currency, email })
+    // save search history to DynamoDB
+    await saveSearchHistory({ crypto, price, email });
 
     return {
       statusCode: 200,
       body: JSON.stringify({
-        message: `price sent to ${email}`,
+        message: `Price sent to ${email}`,
         data: JSON.stringify(response.data),
       }),
     };
@@ -75,3 +61,53 @@ export const handler = async (event) => {
     };
   }
 };
+
+async function sendEmail({ crypto, price, currency, email }) {
+  const message = `Hello investor! 🚀\n\nThe current price of ${crypto} is ${price} ${currency}.`;
+  const emailParams = {
+    FromEmailAddress: 'chenglinjing11@gmail.com',
+    Destination: {
+      ToAddresses: [email],
+    },
+    Content: {
+      Simple: {
+        Subject: {
+          Data: `Crypto Price: ${crypto}`,
+        },
+        Body: {
+          Text: {
+            Data: message,
+          },
+        },
+      },
+    },
+  };
+
+  const sendCommand = new SendEmailCommand(emailParams);
+  try {
+    await sesClient.send(sendCommand);
+    console.log(`✅ Email sent to ${email}.`);
+  } catch (error) {
+    console.error('❌ Failed to send email:', error);
+  }
+}
+
+async function saveSearchHistory({ crypto, price, email }) {
+  const params = {
+    TableName: 'crypto_search_history',
+    Item: {
+      id: uuidv4(),
+      crypto,
+      price,
+      email,
+      timestamp: new Date().toISOString(),
+    },
+  };
+
+  try {
+    await dbDocClient.send(new PutCommand(params));
+    console.log('✅ Search history saved to DynamoDB.');
+  } catch (error) {
+    console.error('❌ Failed to save search history:', error);
+  }
+}
