@@ -45,8 +45,8 @@ export const handler = async (event) => {
 function parseRequest(body) {
   const parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
   const email = parsedBody.email;
-  const cryptos = parsedBody.crypto?.split(',').map(c => c.trim().toLowerCase()) || [];
-  const currencies = parsedBody.currency?.split(',').map(c => c.trim().toLowerCase()) || [];
+  const cryptos = parsedBody.crypto?.split(',').map(c => c.trim().toLowerCase()).filter(c => c !== '') || [];
+  const currencies = parsedBody.currency?.split(',').map(c => c.trim().toLowerCase()).filter(c => c !== '') || [];
   return { email, cryptos, currencies };
 }
 
