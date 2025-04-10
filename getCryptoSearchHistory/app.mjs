@@ -9,23 +9,25 @@ export const handler = async (event) => {
     const queryParams = event.queryStringParameters || {};
     const email = queryParams.email;
     const limit = parseInt(queryParams.limit) || 10;
-    const startKey = queryParams.startKey ? JSON.parse(decodeURIComponent(queryParams.startKey)) : undefined;
+
+    // return error message if startKey is illegal
+    let startKey;
+    try{
+      startKey = queryParams.startKey ? JSON.parse(decodeURIComponent(queryParams.startKey)) : undefined;
+    } catch(err){
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Invalid parameter: startKey.' }),
+      };
+    }
 
     // return error message if email is illegal
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
           return {
             statusCode: 400,
-            body: JSON.stringify({ error: 'Missing or invalid parameters: email.' }),
+            body: JSON.stringify({ error: 'Missing or invalid parameter: email.' }),
           };
-    }
-
-    // return error message if startKey is illegal
-    if (startKey && typeof startKey !== 'string') {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Missing or invalid parameters: startKey.' }),
-      };
     }
 
     const params = {
