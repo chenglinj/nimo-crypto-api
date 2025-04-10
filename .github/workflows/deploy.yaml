@@ -1,0 +1,38 @@
+name: Deploy SAM App
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install AWS SAM CLI
+        run: npm install -g aws-sam-cli
+
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-southeast-2
+
+      - name: Build SAM project
+        run: sam build
+
+      - name: Deploy SAM project
+        run: sam deploy --no-confirm-changeset --no-fail-on-empty-changeset --stack-name nimo-crypto-api --capabilities CAPABILITY_IAM

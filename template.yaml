@@ -7,12 +7,15 @@ Globals:
   Function:
     Timeout: 10
     Runtime: nodejs22.x
+  Api:
+    Auth:
+      ApiKeyRequired: true
 
 Resources:
   GetCryptoPriceFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: GetCryptoPriceFunction
+      FunctionName: getCryptoPriceAndSendEmail
       CodeUri: getCryptoPriceAndSendEmail/
       Handler: app.handler
       Events:
@@ -25,17 +28,64 @@ Resources:
         - AmazonSESFullAccess
         - DynamoDBCrudPolicy:
             TableName: crypto_search_history
+  GetCryptoSearchHistoryFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: getCryptoSearchHistory
+      CodeUri: getCryptoSearchHistory/
+      Handler: app.handler
+      Events:
+        CryptoSearchApi:
+          Type: Api
+          Properties:
+            Path: /crypto/history
+            Method: get
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: crypto_search_history
   CryptoSearchHistoryTable:
     Type: AWS::DynamoDB::Table
     Properties:
       TableName: crypto_search_history
       BillingMode: PAY_PER_REQUEST
       AttributeDefinitions:
-        - AttributeName: id
+        - AttributeName: email
+          AttributeType: S
+        - AttributeName: timestamp
           AttributeType: S
       KeySchema:
-        - AttributeName: id
+        - AttributeName: email
           KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+  MyUsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      UsagePlanName: "CryptoAPIUsagePlan"
+      ApiStages:
+        - ApiId: !Ref ServerlessRestApi
+          Stage: Prod
+      Description: "Usage plan for Crypto API"
+      Throttle:
+        RateLimit: 10
+        BurstLimit: 2
+      Quota:
+        Limit: 1000
+        Period: MONTH
+  MyApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Name: "CryptoAPIKey"
+      Enabled: true
+      StageKeys:
+        - RestApiId: !Ref ServerlessRestApi
+          StageName: Prod
+  MyUsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref MyApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref MyUsagePlan
 
 Outputs:
   GetCryptoPriceFunctionApi:
@@ -44,3 +94,15 @@ Outputs:
   GetCryptoPriceFunction:
     Description: "GetCryptoPriceFunction ARN"
     Value: !GetAtt GetCryptoPriceFunction.Arn
+  GetCryptoSearchHistoryFunctionApi:
+    Description: "API Gateway endpoint URL for GetCryptoSearchHistoryFunction"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/crypto/history"
+  GetCryptoSearchHistoryFunction:
+    Description: "GetCryptoSearchHistoryFunction ARN"
+    Value: !GetAtt GetCryptoSearchHistoryFunction.Arn
+  CryptoSearchHistoryTable:
+    Description: "CryptoSearchHistoryTable ARN"
+    Value: !GetAtt CryptoSearchHistoryTable.Arn
+  CryptoApiKey:
+    Description: "API Key for accessing protected endpoints"
+    Value: !Ref MyApiKey
