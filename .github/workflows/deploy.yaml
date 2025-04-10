@@ -18,7 +18,12 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
+      - name: Install dependencies for getCryptoPriceAndSendEmail
+        working-directory: ./getCryptoPriceAndSendEmail
+        run: npm install
+
+      - name: Install dependencies for getCryptoSearchHistory
+        working-directory: ./getCryptoSearchHistory
         run: npm install
 
       - name: Install AWS SAM CLI
