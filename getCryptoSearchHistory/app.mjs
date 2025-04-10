@@ -20,14 +20,6 @@ export const handler = async (event) => {
           };
     }
 
-    // return error message if limit is illegal
-    if (isNaN(limit) || limit <= 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Missing or invalid parameters: limit.' }),
-      };
-    }
-
     // return error message if startKey is illegal
     if (startKey && typeof startKey !== 'string') {
       return {
