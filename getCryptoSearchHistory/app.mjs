@@ -48,7 +48,7 @@ export const handler = async (event) => {
       statusCode: 200,
       body: JSON.stringify({
         items: result.Items,
-        lastEvaluatedKey: result.LastEvaluatedKey
+        nextStartKey: result.LastEvaluatedKey
           ? encodeURIComponent(JSON.stringify(result.LastEvaluatedKey))
           : null,
       }),

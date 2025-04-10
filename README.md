@@ -8,7 +8,6 @@ This project consists of two microservices built with Node.js and AWS services (
 - [Tech Stack](#tech-stack)
 - [Setup](#setup)
 - [Usage](#usage)
-- [API Reference](#api-reference)
 
 ## Features
 
@@ -60,7 +59,12 @@ Before running the project, make sure you have the following:
 
 ## Usage
 
-Once the setup is complete, you can use the microservices by sending POST requests to the API. Here’s how:
+Once the setup is complete, you can use the microservices by sending requests to the API. Here’s how:
+
+### 1. `POST /crypto/price`
+
+### Description
+This endpoint allows users to look up cryptocurrency prices by specifying one or more cryptocurrencies and fiat currencies. It sends the price data via email and saves the search history to DynamoDB.
 
 ### Example Request
 
@@ -71,9 +75,10 @@ Once the setup is complete, you can use the microservices by sending POST reques
   "currency": "usd, eur"
 }
 ```
-### Endpoint
 
-- **POST /crypto/price**: This endpoint triggers the cryptocurrency price lookup and sends the result to the provided email.
+- `email` (string, required): The email address of the user requesting the price lookup.
+- `crypto` (string, required): A comma-separated list of cryptocurrency names (e.g., bitcoin, ethereum).
+- `currency` (string, required): A comma-separated list of fiat currencies (e.g., usd, eur).
 
 ### Response
 
@@ -84,25 +89,46 @@ On successful execution, the response will return a message indicating that the 
   "message": "Price sent to user@example.com"
 }
 ```
-## API Reference
 
-### POST /crypto/price
+- A success message indicating that the email with the prices has been sent.
+- Possible error messages in case of invalid parameters or issues with the API.
 
-- **Request Body**:
-  - ```email```: The user's email address (required).
-  - ```crypto```: Comma-separated list of cryptocurrency names (e.g., bitcoin, ethereum) (required).
-  - ```currency```: Comma-separated list of fiat currencies (e.g., usd, eur) (required).
+### 2. `GET /crypto/history`
 
-- **Response**:
-  - A success message indicating that the email with the prices has been sent.
-  - Possible error messages in case of invalid parameters or issues with the API.
+### Description
+This endpoint retrieves the cryptocurrency search history for a user based on their email. The response includes a list of previously searched cryptocurrencies along with the timestamp of each search. If there are more records to fetch, a `nextStartKey` will be returned to allow pagination for subsequent requests.
 
-### GET /crypto/history
-- **Request Parameters**:
-  - ```email```: The user's email address (required).
-  - ```limit```: The limit of the search histories returned (optional).
-  - ```startKey```: Used for paginating results, providing the key from which the next set of data will be retrieved in subsequent requests (optional).
+### Example Request
 
-- **Response**:
-  - Search histories for the input email.
-  - Possible error messages in case of invalid parameters or issues with the API.
+```http
+GET /crypto/history?email=user@example.com&limit=5&startKey=somePaginationKey
+```
+
+- `email` (string, required): The email address of the user whose search history is being requested.
+- `limit` (integer, optional): The maximum number of search history records to return. Defaults to 10 if not provided.
+- `startKey` (string, optional): The pagination key to start the next set of results from. This is returned in the previous response as `nextStartKey` if there are more records to fetch.
+
+### Response
+
+```json
+{
+  "items": [
+    {
+      "id": "f211bee2-7cca-482c-95f7-3560ead4a1c4",
+      "email": "user@example.com",
+      "crypto": "bitcoin, ethereum",
+      "timestamp": "2025-04-10T17:45:14.233Z"
+    },
+    {
+      "id": "9aff970f-4361-4b68-b85f-5ac75e7da7be",
+      "email": "user@example.com",
+      "crypto": "litecoin, ripple",
+      "timestamp": "2025-04-10T17:44:26.786Z"
+    }
+  ],
+  "nextStartKey": "nextPaginationKey"
+}
+```
+
+- Search histories for the input email.
+- Possible error messages in case of invalid parameters or issues with the API.
