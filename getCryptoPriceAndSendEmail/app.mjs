@@ -21,7 +21,7 @@ export const handler = async (event) => {
 
     // Check if validCryptos and validCurrencies are already cached
     // If not, fetch them from the API
-    if (!validCryptos.length || !validCurrencies.length) {
+    if (validCryptos.length === 0 || validCurrencies.length === 0) {
       [validCryptos, validCurrencies] = await Promise.all([getValidCryptos(), getValidCurrencies()]);
     }
 
@@ -56,10 +56,10 @@ async function validateInputs(email, cryptos, currencies) {
     throw new Error('Missing or invalid parameter: email.');
   }
   // Validate crypto and currency
-  if (!cryptos.length) {
+  if (!cryptos || cryptos.length === 0) {
     throw new Error('Missing or invalid parameter: crypto.');
   }
-  if (!currencies.length) {
+  if (!currencies || currencies.length === 0) {
     throw new Error('Missing or invalid parameter: currency.');
   }
 }
