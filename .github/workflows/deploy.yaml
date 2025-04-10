@@ -22,7 +22,7 @@ jobs:
         run: npm install
 
       - name: Install AWS SAM CLI
-        run: npm install -g aws-sam-cli
+        uses: aws-actions/aws-sam-cli-action@v1.0.0
 
       - name: Set up AWS CLI
         uses: aws-actions/configure-aws-credentials@v2
