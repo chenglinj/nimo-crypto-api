@@ -32,7 +32,7 @@ export const handler = async (event) => {
     if (!email || !emailRegex.test(email)) {
           return {
             statusCode: 400,
-            body: JSON.stringify({ error: 'Missing or invalid parameters: email.' }),
+            body: JSON.stringify({ error: 'Missing or invalid parameter: email.' }),
           };
     }
 
@@ -40,7 +40,7 @@ export const handler = async (event) => {
     if (!cryptos || cryptos.length === 0) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing or invalid parameters: crypto.' }),
+        body: JSON.stringify({ error: 'Missing or invalid parameter: crypto.' }),
       };
     }
 
@@ -48,7 +48,7 @@ export const handler = async (event) => {
     if (!currencies || currencies.length === 0) {
       return {
         statusCode: 400,
-        body: JSON.stringify({ error: 'Missing or invalid parameters: currency.' }),
+        body: JSON.stringify({ error: 'Missing or invalid parameter: currency.' }),
       };
     }
 
