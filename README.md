@@ -1,127 +1,108 @@
-# nimo-crypto-api
+# Cryptocurrency Price Lookup Microservices
 
-This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes the following files and folders.
+This project consists of two microservices built with Node.js and AWS services (SES, DynamoDB, and CoinGecko API). The services allow users to look up cryptocurrency prices and receive the results via email.
 
-- hello-world - Code for the application's Lambda function.
-- events - Invocation events that you can use to invoke the function.
-- hello-world/tests - Unit tests for the application code. 
-- template.yaml - A template that defines the application's AWS resources.
+## Table of Contents
 
-The application uses several AWS resources, including Lambda functions and an API Gateway API. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Setup](#setup)
+- [Usage](#usage)
+- [API Reference](#api-reference)
 
-If you prefer to use an integrated development environment (IDE) to build and test your application, you can use the AWS Toolkit.  
-The AWS Toolkit is an open source plug-in for popular IDEs that uses the SAM CLI to build and deploy serverless applications on AWS. The AWS Toolkit also adds a simplified step-through debugging experience for Lambda function code. See the following links to get started.
+## Features
 
-* [CLion](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [GoLand](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [IntelliJ](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [WebStorm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [Rider](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [PhpStorm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [PyCharm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [RubyMine](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [DataGrip](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [VS Code](https://docs.aws.amazon.com/toolkit-for-vscode/latest/userguide/welcome.html)
-* [Visual Studio](https://docs.aws.amazon.com/toolkit-for-visual-studio/latest/user-guide/welcome.html)
+- Retrieve cryptocurrency prices from CoinGecko API.
+- Support querying multiple cryptocurrencies and displaying prices in multiple fiat currencies.
+- Send price results to the user’s email via AWS SES.
+- Save search history to DynamoDB for future reference.
 
-## Deploy the sample application
+## Tech Stack
 
-The Serverless Application Model Command Line Interface (SAM CLI) is an extension of the AWS CLI that adds functionality for building and testing Lambda applications. It uses Docker to run your functions in an Amazon Linux environment that matches Lambda. It can also emulate your application's build environment and API.
+- **Node.js**: Backend framework.
+- **AWS SES (Simple Email Service)**: Sending emails with price results.
+- **AWS DynamoDB**: Storing search history.
+- **CoinGecko API**: Providing cryptocurrency price data.
+- **Axios**: HTTP client for API requests.
+- **UUID**: Generating unique IDs for search history entries.
 
-To use the SAM CLI, you need the following tools.
+## Setup
 
-* SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
-* Node.js - [Install Node.js 22](https://nodejs.org/en/), including the NPM package management tool.
-* Docker - [Install Docker community edition](https://hub.docker.com/search/?type=edition&offering=community)
+### Prerequisites
 
-To build and deploy your application for the first time, run the following in your shell:
+Before running the project, make sure you have the following:
 
-```bash
-sam build
-sam deploy --guided
+- [Node.js](https://nodejs.org/) installed on your machine.
+- An AWS account with SES and DynamoDB setup and credentials configured (preferably with environment variables).
+
+### Install Dependencies
+
+1. Clone the repository:
+
+   ```bash
+   git clone https://github.com/chenglinj/nimo-crypto-api.git
+   cd nimo-crypto-api
+   ```
+
+2. Install the necessary dependencies:
+   ```bash
+   cd getCryptoPriceAndSendEmail
+   npm install
+   cd ../getCryptoSearchHistory
+   npm install
+   ```
+
+### Configuration
+
+1. Configure your AWS SES and DynamoDB credentials. Make sure that your SES is verified and allowed to send emails in the desired region (ap-southeast-2).
+
+2. (Optional) If you want to modify the supported cryptocurrencies or currencies, you can update the CoinGecko API requests in the code.
+
+## Usage
+
+Once the setup is complete, you can use the microservices by sending POST requests to the API. Here’s how:
+
+### Example Request
+
+```json
+{
+  "email": "user@example.com",
+  "crypto": "bitcoin, ethereum",
+  "currency": "usd, eur"
+}
 ```
+### Endpoint
 
-The first command will build the source of your application. The second command will package and deploy your application to AWS, with a series of prompts:
+- **POST /crypto/price**: This endpoint triggers the cryptocurrency price lookup and sends the result to the provided email.
 
-* **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
-* **AWS Region**: The AWS region you want to deploy your app to.
-* **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
-* **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
-* **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
+### Response
 
-You can find your API Gateway Endpoint URL in the output values displayed after deployment.
+On successful execution, the response will return a message indicating that the email has been sent:
 
-## Use the SAM CLI to build and test locally
-
-Build your application with the `sam build` command.
-
-```bash
-nimo-crypto-api$ sam build
+```json
+{
+  "message": "Price sent to user@example.com"
+}
 ```
+## API Reference
 
-The SAM CLI installs dependencies defined in `hello-world/package.json`, creates a deployment package, and saves it in the `.aws-sam/build` folder.
+### POST /crypto/price
 
-Test a single function by invoking it directly with a test event. An event is a JSON document that represents the input that the function receives from the event source. Test events are included in the `events` folder in this project.
+- **Request Body**:
+  - ```email```: The user's email address (required).
+  - ```crypto```: Comma-separated list of cryptocurrency names (e.g., bitcoin, ethereum) (required).
+  - ```currency```: Comma-separated list of fiat currencies (e.g., usd, eur) (required).
 
-Run functions locally and invoke them with the `sam local invoke` command.
+- **Response**:
+  - A success message indicating that the email with the prices has been sent.
+  - Possible error messages in case of invalid parameters or issues with the API.
 
-```bash
-nimo-crypto-api$ sam local invoke HelloWorldFunction --event events/event.json
-```
+### GET /crypto/history
+- **Request Parameters**:
+  - ```email```: The user's email address (required).
+  - ```limit```: The limit of the search histories returned (optional).
+  - ```startKey```: Used for paginating results, providing the key from which the next set of data will be retrieved in subsequent requests (optional).
 
-The SAM CLI can also emulate your application's API. Use the `sam local start-api` to run the API locally on port 3000.
-
-```bash
-nimo-crypto-api$ sam local start-api
-nimo-crypto-api$ curl http://localhost:3000/
-```
-
-The SAM CLI reads the application template to determine the API's routes and the functions that they invoke. The `Events` property on each function's definition includes the route and method for each path.
-
-```yaml
-      Events:
-        HelloWorld:
-          Type: Api
-          Properties:
-            Path: /hello
-            Method: get
-```
-
-## Add a resource to your application
-The application template uses AWS Serverless Application Model (AWS SAM) to define application resources. AWS SAM is an extension of AWS CloudFormation with a simpler syntax for configuring common serverless application resources such as functions, triggers, and APIs. For resources not included in [the SAM specification](https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md), you can use standard [AWS CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) resource types.
-
-## Fetch, tail, and filter Lambda function logs
-
-To simplify troubleshooting, SAM CLI has a command called `sam logs`. `sam logs` lets you fetch logs generated by your deployed Lambda function from the command line. In addition to printing the logs on the terminal, this command has several nifty features to help you quickly find the bug.
-
-`NOTE`: This command works for all AWS Lambda functions; not just the ones you deploy using SAM.
-
-```bash
-nimo-crypto-api$ sam logs -n HelloWorldFunction --stack-name nimo-crypto-api --tail
-```
-
-You can find more information and examples about filtering Lambda function logs in the [SAM CLI Documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-logging.html).
-
-## Unit tests
-
-Tests are defined in the `hello-world/tests` folder in this project. Use NPM to install the [Mocha test framework](https://mochajs.org/) and run unit tests.
-
-```bash
-nimo-crypto-api$ cd hello-world
-hello-world$ npm install
-hello-world$ npm run test
-```
-
-## Cleanup
-
-To delete the sample application that you created, use the AWS CLI. Assuming you used your project name for the stack name, you can run the following:
-
-```bash
-sam delete --stack-name nimo-crypto-api
-```
-
-## Resources
-
-See the [AWS SAM developer guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) for an introduction to SAM specification, the SAM CLI, and serverless application concepts.
-
-Next, you can use AWS Serverless Application Repository to deploy ready to use Apps that go beyond hello world samples and learn how authors developed their applications: [AWS Serverless Application Repository main page](https://aws.amazon.com/serverless/serverlessrepo/)
+- **Response**:
+  - Search histories for the input email.
+  - Possible error messages in case of invalid parameters or issues with the API.
