@@ -4,163 +4,119 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { PutCommand, DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuidv4 } from 'uuid';
 
-const sesClient = new SESv2Client({ region: 'ap-southeast-2' });
-const dbClient = new DynamoDBClient({ region: 'ap-southeast-2' });
+const REGION = 'ap-southeast-2';
+const sesClient = new SESv2Client({ region: REGION });
+const dbClient = new DynamoDBClient({ region: REGION });
 const dbDocClient = DynamoDBDocumentClient.from(dbClient);
 
-// cache for valid crypto and currency
-// to avoid multiple API calls
+// Cache for valid crypto and currency to avoid multiple API calls
 let validCryptos = [];
 let validCurrencies = [];
 
-/**
- * Example request:
- * {
- *   "crypto": "bitcoin",
- *   "currency": "usd"
- * }
- */
 export const handler = async (event) => {
   try {
-    const body = typeof event.body === 'string' ? JSON.parse(event.body) : event.body;
-    const email = body.email;
-    const cryptos = body.crypto?.split(',').map(c => c.trim().toLowerCase());
-    const currencies = body.currency?.split(',').map(c => c.trim().toLowerCase());
+    const { email, cryptos, currencies } = parseRequest(event.body);
 
-    // return error message if email is illegal
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email || !emailRegex.test(email)) {
-          return {
-            statusCode: 400,
-            body: JSON.stringify({ error: 'Missing or invalid parameter: email.' }),
-          };
-    }
+    await validateInputs(email, cryptos, currencies);
 
-    // return error message if crypto is illegal
-    if (!cryptos || cryptos.length === 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Missing or invalid parameter: crypto.' }),
-      };
-    }
-
-    // return error message if currency is illegal
-    if (!currencies || currencies.length === 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Missing or invalid parameter: currency.' }),
-      };
-    }
-
-    // get valid cryptos and currencies from CoinGecko API
+    // Check if validCryptos and validCurrencies are already cached
+    // If not, fetch them from the API
     if (!validCryptos.length || !validCurrencies.length) {
-      validCryptos = await getValidCryptos();
-      validCurrencies = await getValidCurrencies();
+      [validCryptos, validCurrencies] = await Promise.all([getValidCryptos(), getValidCurrencies()]);
     }
 
-    // check if the input cryptos are valid
-    const invalidCryptos = cryptos.filter(c => !validCryptos.includes(c));
-    if (invalidCryptos.length > 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: `Invalid crypto: ${invalidCryptos.join(', ')}` }),
-      };
-    }
+    validateAgainstAPI(cryptos, validCryptos, 'crypto');
+    validateAgainstAPI(currencies, validCurrencies, 'currency');
 
-    // check if the input currencies are valid
-    const invalidCurrencies = currencies.filter(c => !validCurrencies.includes(c));
-    if (invalidCurrencies.length > 0) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: `Invalid currency: ${invalidCurrencies.join(', ')}` }),
-      };
-    }
-
-    // get crypto price from CoinGecko API
+    // Fetch crypto prices
     const priceData = await getCryptoPrice(cryptos, currencies);
 
-    // send email via SES
-    await sendEmail({ email, priceData, cryptos, currencies });
-    // save search history to DynamoDB
-    await saveSearchHistory({ email, cryptos });
+    await Promise.all([
+      sendEmail({ email, priceData, cryptos, currencies }),
+      saveSearchHistory({ email, cryptos }),
+    ]);
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: `Price sent to ${email}`,
-      }),
-    };
-
+    return successResponse(`Price sent to ${email}`);
   } catch (err) {
-    console.error(err);
-    if (axios.isAxiosError(err) && err.response?.status === 429) {
-      // handle 429 error (rate limit exceeded)
-      return {
-        statusCode: 429,
-        body: JSON.stringify({ error: 'Request exceeds free CoinGecko API fequency limit, please try later.' }),
-      };
-    } else {
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'Internal Server Error' }),
-      };
-    }
+    return handleError(err);
   }
 };
 
-// get valid crypto ID list
-async function getValidCryptos() {
-  const res = await axios.get('https://api.coingecko.com/api/v3/coins/list');
-  return res.data.map(c => c.id); // get all valid crypto ID e.g. ['bitcoin', 'ethereum', ...]
+function parseRequest(body) {
+  const parsedBody = typeof body === 'string' ? JSON.parse(body) : body;
+  const email = parsedBody.email;
+  const cryptos = parsedBody.crypto?.split(',').map(c => c.trim().toLowerCase()) || [];
+  const currencies = parsedBody.currency?.split(',').map(c => c.trim().toLowerCase()) || [];
+  return { email, cryptos, currencies };
 }
 
-// get valid currency list
+async function validateInputs(email, cryptos, currencies) {
+  // Validate email format
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error('Missing or invalid parameter: email.');
+  }
+  // Validate crypto and currency
+  if (!cryptos.length) {
+    throw new Error('Missing or invalid parameter: crypto.');
+  }
+  if (!currencies.length) {
+    throw new Error('Missing or invalid parameter: currency.');
+  }
+}
+
+function validateAgainstAPI(inputList, validList, type) {
+  // Check if any invalid items exist
+  const invalidItems = inputList.filter(item => !validList.includes(item));
+  if (invalidItems.length) {
+    throw new Error(`Invalid ${type}: ${invalidItems.join(', ')}`);
+  }
+}
+
+async function getValidCryptos() {
+  const res = await axios.get('https://api.coingecko.com/api/v3/coins/list');
+  return res.data.map(c => c.id);
+}
+
 async function getValidCurrencies() {
   const res = await axios.get('https://api.coingecko.com/api/v3/simple/supported_vs_currencies');
-  return res.data; // get all valid currency e.g. ['usd', 'eur', 'aud', ...]
+  return res.data;
 }
 
 async function getCryptoPrice(cryptos, currencies) {
-  const res = await axios.get(`https://api.coingecko.com/api/v3/simple/price?ids=${cryptos.join(',')}&vs_currencies=${currencies.join(',')}`)
-  return res.data
+  const res = await axios.get(`https://api.coingecko.com/api/v3/simple/price`, {
+    params: { ids: cryptos.join(','), vs_currencies: currencies.join(',') },
+  });
+  return res.data;
 }
 
 async function sendEmail({ email, priceData, cryptos, currencies }) {
   const htmlContent = generateEmailContent(priceData, cryptos, currencies);
-
   const params = {
     FromEmailAddress: 'chenglinjing11@gmail.com',
-    Destination: {
-      ToAddresses: [email]
-    },
+    Destination: { ToAddresses: [email] },
     Content: {
       Simple: {
-        Subject: {
-          Charset: "UTF-8",
-          Data: "Your Cryptocurrency Price Lookup Results"
-        },
-        Body: {
-          Html: {
-            Charset: "UTF-8",
-            Data: htmlContent
-          }
-        }
-      }
-    }
+        Subject: { Charset: 'UTF-8', Data: 'Your Cryptocurrency Price Lookup Results' },
+        Body: { Html: { Charset: 'UTF-8', Data: htmlContent } },
+      },
+    },
   };
 
-  const sendCommand = new SendEmailCommand(params);
-  try {
-    await sesClient.send(sendCommand);
-    console.log(`✅ Email sent to ${email}.`);
-  } catch (error) {
-    console.error('❌ Failed to send email:', error);
-    throw error; // Rethrow the error to be handled in the main handler
-  }
+  await sesClient.send(new SendEmailCommand(params));
+  console.log(`✅ Email sent to ${email}.`);
 }
 
+// Generate HTML content for the email
 function generateEmailContent(priceData, cryptos, currencies) {
-  let html = `
+  const rows = cryptos.map(crypto => {
+    const cells = currencies.map(currency => {
+      const price = priceData[crypto]?.[currency];
+      return `<td>${price !== undefined ? price : 'N/A'}</td>`;
+    }).join('');
+    return `<tr><td>${crypto}</td>${cells}</tr>`;
+  }).join('');
+
+  return `
     <html>
     <body>
       <p>Hello Investor! 🚀</p>
@@ -172,22 +128,13 @@ function generateEmailContent(priceData, cryptos, currencies) {
             ${currencies.map(currency => `<th>${currency.toUpperCase()}</th>`).join('')}
           </tr>
         </thead>
-        <tbody>
-          ${cryptos.map(crypto => {
-            const row = currencies.map(currency => {
-              const price = priceData[crypto]?.[currency];
-              return `<td>${price !== undefined ? price : 'N/A'}</td>`;
-            }).join('');
-            return `<tr><td>${crypto}</td>${row}</tr>`;
-          }).join('')}
-        </tbody>
+        <tbody>${rows}</tbody>
       </table>
       <p>We hope this information helps you stay on top of the market. If you have any further questions, feel free to reach out.</p>
       <p>Best regards,<br>Nimo Crypto Team</p>
     </body>
     </html>
   `;
-  return html;
 }
 
 async function saveSearchHistory({ email, cryptos }) {
@@ -201,11 +148,27 @@ async function saveSearchHistory({ email, cryptos }) {
     },
   };
 
-  try {
-    await dbDocClient.send(new PutCommand(params));
-    console.log('✅ Search history saved to DynamoDB.');
-  } catch (error) {
-    console.error('❌ Failed to save search history:', error);
-    throw error; // Rethrow the error to be handled in the main handler
+  await dbDocClient.send(new PutCommand(params));
+  console.log('✅ Search history saved to DynamoDB.');
+}
+
+function successResponse(message) {
+  return {
+    statusCode: 200,
+    body: JSON.stringify({ message }),
+  };
+}
+
+function handleError(err) {
+  console.error(err);
+  if (axios.isAxiosError(err) && err.response?.status === 429) {
+    return {
+      statusCode: 429,
+      body: JSON.stringify({ error: 'Request exceeds free CoinGecko API frequency limit, please try later.' }),
+    };
   }
+  return {
+    statusCode: 500,
+    body: JSON.stringify({ error: err.message || 'Internal Server Error' }),
+  };
 }
